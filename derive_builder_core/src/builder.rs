@@ -112,7 +112,7 @@ pub struct Builder<'a> {
     pub create_empty: syn::Ident,
     /// Type parameters and lifetimes attached to this builder's struct
     /// definition.
-    pub generics: Option<&'a syn::Generics>,
+    pub generics: &'a syn::Generics,
     /// Visibility of the builder struct, e.g. `syn::Visibility::Public`.
     pub visibility: Cow<'a, syn::Visibility>,
     /// Fields of the builder struct, e.g. `foo: u32,`
@@ -150,11 +150,7 @@ impl<'a> ToTokens for Builder<'a> {
             let builder_ident = &self.ident;
             let bounded_generics = self.compute_impl_bounds();
             let (impl_generics, _, _) = bounded_generics.split_for_impl();
-            let (struct_generics, ty_generics, where_clause) = self
-                .generics
-                .map(syn::Generics::split_for_impl)
-                .map(|(i, t, w)| (Some(i), Some(t), Some(w)))
-                .unwrap_or((None, None, None));
+            let (struct_generics, ty_generics, where_clause) = self.generics.split_for_impl();
             let builder_fields = &self.fields;
             let builder_field_initializers = &self.field_initializers;
             let create_empty = &self.create_empty;
@@ -305,30 +301,27 @@ impl<'a> Builder<'a> {
     /// `Clone` impl. This is the same as how the built-in derives for
     /// `Clone`, `Default`, `PartialEq`, and other traits work.
     fn compute_impl_bounds(&self) -> syn::Generics {
-        if let Some(type_gen) = self.generics {
-            let mut generics = type_gen.clone();
+        let type_gen = self.generics;
+        let mut generics = type_gen.clone();
 
-            if !self.pattern.requires_clone() || type_gen.type_params().next().is_none() {
-                return generics;
-            }
-
-            let crate_root = self.crate_root;
-
-            let clone_bound = TypeParamBound::Trait(TraitBound {
-                paren_token: None,
-                modifier: TraitBoundModifier::None,
-                lifetimes: None,
-                path: syn::parse_quote!(#crate_root::export::core::clone::Clone),
-            });
-
-            for typ in generics.type_params_mut() {
-                typ.bounds.push(clone_bound.clone());
-            }
-
-            generics
-        } else {
-            Default::default()
+        if !self.pattern.requires_clone() || type_gen.type_params().next().is_none() {
+            return generics;
         }
+
+        let crate_root = self.crate_root;
+
+        let clone_bound = TypeParamBound::Trait(TraitBound {
+            paren_token: None,
+            modifier: TraitBoundModifier::None,
+            lifetimes: None,
+            path: syn::parse_quote!(#crate_root::export::core::clone::Clone),
+        });
+
+        for typ in generics.type_params_mut() {
+            typ.bounds.push(clone_bound.clone());
+        }
+
+        generics
     }
 }
 
@@ -350,7 +343,7 @@ macro_rules! default_builder {
             impl_attrs: &vec![],
             impl_default: true,
             create_empty: syn::Ident::new("create_empty", ::proc_macro2::Span::call_site()),
-            generics: None,
+            generics: &syn::Generics::default(),
             visibility: ::std::borrow::Cow::Owned(parse_quote!(pub)),
             fields: vec![quote!(foo: u32,)],
             field_initializers: vec![quote!(foo: ::db::export::core::default::Default::default(), )],
@@ -523,7 +516,7 @@ mod tests {
         };
         let generics = ast.generics;
         let mut builder = default_builder!();
-        builder.generics = Some(&generics);
+        builder.generics = &generics;
 
         assert_eq!(
             quote!(#builder).to_string(),
@@ -583,7 +576,7 @@ mod tests {
 
         let generics = ast.generics;
         let mut builder = default_builder!();
-        builder.generics = Some(&generics);
+        builder.generics = &generics;
 
         assert_eq!(
             quote!(#builder).to_string(),
@@ -645,7 +638,7 @@ mod tests {
         };
         let generics = ast.generics;
         let mut builder = default_builder!();
-        builder.generics = Some(&generics);
+        builder.generics = &generics;
         builder.pattern = BuilderPattern::Owned;
         builder.must_derive_clone = false;
 

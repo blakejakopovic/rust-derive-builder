@@ -703,7 +703,7 @@ impl Options {
             impl_attrs: &self.impl_attrs,
             impl_default: !self.custom_constructor.is_present(),
             create_empty: self.create_empty.clone(),
-            generics: Some(&self.generics),
+            generics: &self.generics,
             visibility: self.builder_vis(),
             fields: Vec::with_capacity(self.field_count()),
             field_initializers: Vec::with_capacity(self.field_count()),
