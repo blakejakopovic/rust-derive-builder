@@ -150,7 +150,11 @@ impl<'a> ToTokens for Builder<'a> {
             let builder_ident = &self.ident;
             let bounded_generics = self.compute_impl_bounds();
             let (impl_generics, _, _) = bounded_generics.split_for_impl();
-            let (struct_generics, ty_generics, where_clause) = self.generics.split_for_impl();
+            // Use the full generics for struct_generics to include defaults for
+            // generics. The output of split_for_impl doesn't include these, so
+            // we don't use those at all.
+            let struct_generics = self.generics;
+            let (_, ty_generics, where_clause) = self.generics.split_for_impl();
             let builder_fields = &self.fields;
             let builder_field_initializers = &self.field_initializers;
             let create_empty = &self.create_empty;
